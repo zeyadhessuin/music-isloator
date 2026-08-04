@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>فصل الصوت — Vocals & Def Studio</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <h1>فصل الصوت</h1>
+      <p class="subtitle">Vocals + Def (Drums) Separator</p>
+      <p class="tagline">Keep only the vocals and the percussion. Drop the bass and everything else.</p>
+    </header>
+
+    <section class="panel">
+      <form id="job-form">
+        <div class="field">
+          <label for="urls">YouTube / Web URLs <span>(one per line)</span></label>
+          <textarea id="urls" name="urls" rows="4"
+            placeholder="https://www.youtube.com/watch?v=...&#10;https://example.com/song.mp3"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="files">Or upload audio / video files</label>
+          <div class="dropzone" id="dropzone">
+            <input type="file" id="files" name="files" multiple
+              accept=".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.wma,.aiff,.mp4,.mkv,.webm,.mov,.avi" />
+            <p>Click to choose files or drag &amp; drop here</p>
+            <ul id="file-list"></ul>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="model">Separation model</label>
+            <select id="model" name="model">
+              <option value="htdemucs" selected>htdemucs (default, fast &amp; good)</option>
+              <option value="htdemucs_ft">htdemucs_ft (fine-tuned, best quality)</option>
+              <option value="BS-RoFormer">BS-RoFormer (heavy, highest quality)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="format">Output format</label>
+            <select id="format" name="format">
+              <option value="mp3" selected>MP3</option>
+              <option value="wav">WAV</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="bitrate">MP3 bitrate</label>
+            <select id="bitrate" name="bitrate">
+              <option value="320k" selected>320 kbps</option>
+              <option value="256k">256 kbps</option>
+              <option value="192k">192 kbps</option>
+              <option value="128k">128 kbps</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn-primary">
+          <span class="btn-label">Separate Vocals + Def</span>
+          <span class="btn-spinner" hidden></span>
+        </button>
+      </form>
+    </section>
+
+    <section class="jobs">
+      <h2>Jobs</h2>
+      <div id="jobs" class="job-list">
+        <p class="empty">No jobs yet. Paste a URL or upload a file to get started.</p>
+      </div>
+    </section>
+  </main>
+
+  <template id="job-template">
+    <article class="job-card">
+      <div class="job-header">
+        <span class="job-id"></span>
+        <span class="badge"></span>
+        <span class="job-message"></span>
+        <button class="toggle-logs" type="button">logs</button>
+      </div>
+      <div class="progress"><div class="bar"></div></div>
+      <ul class="results"></ul>
+      <pre class="logs" hidden></pre>
+    </article>
+  </template>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

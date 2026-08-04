@@ -1,0 +1,7 @@
+yt-dlp>=2024.8.6
+audio-separator>=0.16.1
+onnxruntime>=1.18.0
+pydub>=0.25.1
+torch>=2.0.0
+tqdm>=4.66.0
+flask>=3.0.0
