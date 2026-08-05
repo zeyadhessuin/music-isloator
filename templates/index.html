@@ -59,6 +59,25 @@
           </div>
         </div>
 
+        <div class="row">
+          <div class="field">
+            <label for="preset">Performance preset</label>
+            <select id="preset" name="preset">
+              <option value="fast">Fast (lower quality, quickest)</option>
+              <option value="balanced" selected>Balanced (recommended)</option>
+              <option value="quality">Quality (slower, best results)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="device">Device</label>
+            <select id="device" name="device">
+              <option value="auto" selected>Auto (GPU if available)</option>
+              <option value="cuda">NVIDIA GPU (CUDA)</option>
+              <option value="cpu">CPU only</option>
+            </select>
+          </div>
+        </div>
+
         <button type="submit" id="submit-btn" class="btn-primary">
           <span class="btn-label">Separate Vocals + Def</span>
           <span class="btn-spinner" hidden></span>
@@ -67,7 +86,7 @@
     </section>
 
     <section class="jobs">
-      <h2>Jobs</h2>
+      <h2>Jobs <button id="clear-cache" type="button" class="btn-link">Clear download cache</button></h2>
       <div id="jobs" class="job-list">
         <p class="empty">No jobs yet. Paste a URL or upload a file to get started.</p>
       </div>

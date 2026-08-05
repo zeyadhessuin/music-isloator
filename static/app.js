@@ -13,6 +13,22 @@ const fileInput = document.getElementById("files");
 const fileList = document.getElementById("file-list");
 const jobsEl = document.getElementById("jobs");
 const template = document.getElementById("job-template");
+const clearCacheBtn = document.getElementById("clear-cache");
+
+clearCacheBtn.addEventListener("click", async () => {
+  if (!confirm("Delete all cached downloads? They will be re-downloaded next time.")) return;
+  clearCacheBtn.disabled = true;
+  try {
+    const res = await fetch("/api/cache", { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Request failed");
+    alert(`Cache cleared: removed ${data.removed} file(s).`);
+  } catch (err) {
+    alert("Failed to clear cache:\n" + err.message);
+  } finally {
+    clearCacheBtn.disabled = false;
+  }
+});
 
 function trackJob(id) {
   let ids = JSON.parse(localStorage.getItem(JOBS_KEY) || "[]");

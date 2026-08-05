@@ -20,10 +20,20 @@ from urllib.parse import quote
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
 import separator
-from separator import DEFAULT_MODEL, process_items, sanitize_filename, SeparationEngine
+from separator import (
+    DEFAULT_CACHE_DIR,
+    DEFAULT_MODEL,
+    cache_info,
+    check_disk_space,
+    clear_cache,
+    process_items,
+    sanitize_filename,
+    SeparationEngine,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "output"
+CACHE_DIR = DEFAULT_CACHE_DIR
 TEMP_BASE = Path(tempfile.gettempdir()) / "vocal_def_web"
 UPLOAD_DIR = TEMP_BASE / "uploads"
 QUEUE = queue.Queue()
@@ -112,11 +122,12 @@ class Job:
 # Worker
 # --------------------------------------------------------------------------- #
 
-def get_engine(model_name, device):
-    key = f"{model_name}|{device}"
+def get_engine(model_name, device, segment_size=None, shifts=None, overlap=None):
+    key = f"{model_name}|{device}|{segment_size}|{shifts}|{overlap}"
     if key not in ENGINE_CACHE:
         ENGINE_CACHE[key] = SeparationEngine(
-            model_name=model_name, device=device, logger=logging.getLogger("vocal_def")
+            model_name=model_name, device=device, logger=logging.getLogger("vocal_def"),
+            segment_size=segment_size, shifts=shifts, overlap=overlap
         )
     return ENGINE_CACHE[key]
 
@@ -136,14 +147,29 @@ def run_job(job):
     job.state = "running"
     job.started_at = time.time()
     job.add_log("Job started.")
+    try:
+        check_disk_space([Path(tempfile.gettempdir()), OUTPUT_DIR, CACHE_DIR])
+    except RuntimeError as exc:
+        job.state = "error"
+        job.error = str(exc)
+        job.add_log(f"ERROR: {exc}")
+        job.add_log("Free up space (delete old outputs or clear the download cache) and retry.")
+        return
     temp_root = Path(tempfile.mkdtemp(prefix="vocal_def_web_"))
     try:
         job.report(0.0, "starting", "Preparing engine...")
-        engine = get_engine(job.options["model"], job.options.get("device", "auto"))
+        engine = get_engine(
+            job.options["model"], 
+            job.options.get("device", "auto"),
+            segment_size=job.options.get("segment_size"),
+            shifts=job.options.get("shifts"),
+            overlap=job.options.get("overlap")
+        )
         options = {
             "output_dir": str(OUTPUT_DIR),
             "output_format": job.options["output_format"],
             "bitrate": job.options.get("bitrate", "320k"),
+            "cache_dir": job.options.get("cache_dir"),
         }
         result_paths, failures = process_items(
             job.items, engine, options, temp_root, report=job.report
@@ -190,6 +216,23 @@ def worker_loop():
             QUEUE.task_done()
 
 
+def cleanup_stale_temp():
+    """Remove leftover job temp dirs from crashed runs to reclaim disk space."""
+    base = Path(tempfile.gettempdir())
+    removed = 0
+    freed = 0
+    for path in base.glob("vocal_def_web_*"):
+        if not path.is_dir():
+            continue
+        freed += sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+        shutil.rmtree(path, ignore_errors=True)
+        removed += 1
+    if removed:
+        logging.getLogger("vocal_def").info(
+            "Removed %d stale temp dir(s), freeing ~%.1f MB.", removed, freed / (1024 * 1024)
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Routes
 # --------------------------------------------------------------------------- #
@@ -211,6 +254,35 @@ def create_job():
     model = form.get("model", DEFAULT_MODEL).strip() or DEFAULT_MODEL
     bitrate = form.get("bitrate", "320k").strip() or "320k"
     device = form.get("device", "auto").strip() or "auto"
+    
+    # Performance parameters
+    preset = form.get("preset", "balanced").strip() if form.get("preset") else "balanced"
+    segment_size = None
+    shifts = None
+    overlap = None
+    
+    if preset in ("fast", "balanced", "quality"):
+        from separator import PERFORMANCE_PRESETS
+        preset_config = PERFORMANCE_PRESETS[preset]
+        segment_size = preset_config["demucs_segment_size"]
+        shifts = preset_config["demucs_shifts"]
+        overlap = preset_config["demucs_overlap"]
+    
+    # Allow custom values to override preset if provided
+    try:
+        if form.get("segment_size"):
+            segment_size = int(form.get("segment_size"))
+        if form.get("shifts"):
+            shifts = int(form.get("shifts"))
+        if form.get("overlap"):
+            overlap = float(form.get("overlap"))
+    except (ValueError, TypeError):
+        # Fall back to balanced preset if invalid values
+        from separator import PERFORMANCE_PRESETS
+        preset_config = PERFORMANCE_PRESETS["balanced"]
+        segment_size = preset_config["demucs_segment_size"]
+        shifts = preset_config["demucs_shifts"]
+        overlap = preset_config["demucs_overlap"]
 
     items = [{"kind": "url", "source": u} for u in urls]
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -234,6 +306,10 @@ def create_job():
             "model": model,
             "bitrate": bitrate,
             "device": device,
+            "cache_dir": CACHE_DIR,
+            "segment_size": segment_size,
+            "shifts": shifts,
+            "overlap": overlap,
         },
     )
     with JOBS_LOCK:
@@ -262,9 +338,30 @@ def download(filename):
     return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
 
 
+@app.get("/api/cache")
+def cache_status():
+    info = cache_info(CACHE_DIR)
+    info["enabled"] = True
+    return jsonify(info)
+
+
+@app.delete("/api/cache")
+def cache_delete():
+    removed = clear_cache(CACHE_DIR)
+    return jsonify({"removed": removed, **cache_info(CACHE_DIR)})
+
+
 @app.get("/api/health")
 def health():
-    return jsonify({"ok": True, "model_default": DEFAULT_MODEL})
+    from separator import PERFORMANCE_PRESETS
+    return jsonify(
+        {
+            "ok": True, 
+            "model_default": DEFAULT_MODEL, 
+            "cache": cache_info(CACHE_DIR),
+            "presets": PERFORMANCE_PRESETS,
+        }
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -279,7 +376,9 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     setup_logging()
+    cleanup_stale_temp()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     if shutil.which("ffmpeg") is None:
         logging.getLogger("vocal_def").error(

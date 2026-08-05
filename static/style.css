@@ -100,7 +100,19 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.jobs h2 { font-size: 18px; color: var(--muted); margin: 34px 0 12px; }
+.jobs h2 { font-size: 18px; color: var(--muted); margin: 34px 0 12px; display: flex; align-items: center; gap: 12px; }
+.btn-link {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.btn-link:hover { color: var(--blue); border-color: var(--blue); }
+.btn-link:disabled { opacity: 0.5; cursor: not-allowed; }
 .job-list { display: flex; flex-direction: column; gap: 14px; }
 .empty { color: var(--muted); font-size: 13px; }
 
