@@ -264,9 +264,9 @@ def create_job():
     if preset in ("fast", "balanced", "quality"):
         from separator import PERFORMANCE_PRESETS
         preset_config = PERFORMANCE_PRESETS[preset]
-        segment_size = preset_config["demucs_segment_size"]
-        shifts = preset_config["demucs_shifts"]
-        overlap = preset_config["demucs_overlap"]
+        segment_size = preset_config["segment_size"]
+        shifts = preset_config["shifts"]
+        overlap = preset_config["overlap"]
     
     # Allow custom values to override preset if provided
     try:
@@ -280,9 +280,9 @@ def create_job():
         # Fall back to balanced preset if invalid values
         from separator import PERFORMANCE_PRESETS
         preset_config = PERFORMANCE_PRESETS["balanced"]
-        segment_size = preset_config["demucs_segment_size"]
-        shifts = preset_config["demucs_shifts"]
-        overlap = preset_config["demucs_overlap"]
+        segment_size = preset_config["segment_size"]
+        shifts = preset_config["shifts"]
+        overlap = preset_config["overlap"]
 
     items = [{"kind": "url", "source": u} for u in urls]
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

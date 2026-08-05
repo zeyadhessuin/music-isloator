@@ -58,21 +58,21 @@ MODEL_ALIASES = {
 # Performance presets
 PERFORMANCE_PRESETS = {
     "fast": {
-        "demucs_segment_size": 128,
-        "demucs_shifts": 1,
-        "demucs_overlap": 0.15,
+        "segment_size": 128,
+        "shifts": 1,
+        "overlap": 0.15,
         "description": "Fastest processing, lower quality"
     },
     "balanced": {
-        "demucs_segment_size": 256,
-        "demucs_shifts": 2,
-        "demucs_overlap": 0.25,
+        "segment_size": 256,
+        "shifts": 2,
+        "overlap": 0.25,
         "description": "Balanced speed and quality (default)"
     },
     "quality": {
-        "demucs_segment_size": 512,
-        "demucs_shifts": 4,
-        "demucs_overlap": 0.35,
+        "segment_size": 512,
+        "shifts": 4,
+        "overlap": 0.35,
         "description": "Best quality, slower processing"
     }
 }
@@ -493,15 +493,18 @@ class SeparationEngine:
             "log_level": logging.DEBUG if self.logger.isEnabledFor(logging.DEBUG) else logging.INFO,
         }
         
+        # Build demucs_params dictionary for architecture-specific parameters
+        demucs_params = {}
+        
         # Add performance parameters if specified
         if self.segment_size is not None:
-            separator_kwargs["demucs_segment_size"] = self.segment_size
+            demucs_params["segment_size"] = self.segment_size
             self.logger.info("Using segment_size: %s", self.segment_size)
         if self.shifts is not None:
-            separator_kwargs["demucs_shifts"] = self.shifts
+            demucs_params["shifts"] = self.shifts
             self.logger.info("Using shifts: %s", self.shifts)
         if self.overlap is not None:
-            separator_kwargs["demucs_overlap"] = self.overlap
+            demucs_params["overlap"] = self.overlap
             self.logger.info("Using overlap: %s", self.overlap)
         
         # Detect if GPU is available for additional optimizations
@@ -509,10 +512,14 @@ class SeparationEngine:
             import torch
             if torch.cuda.is_available() or (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
                 # Use batch processing for GPU acceleration
-                separator_kwargs["demucs_batch_size"] = 4
+                demucs_params["batch_size"] = 4
                 self.logger.info("GPU detected - using batch_size: 4 for faster processing")
         except Exception:
             pass
+        
+        # Add demucs_params to separator_kwargs if any parameters were set
+        if demucs_params:
+            separator_kwargs["demucs_params"] = demucs_params
         
         self.separator = Separator(**separator_kwargs)
         self.separator.load_model(model_filename=filename)
@@ -757,9 +764,9 @@ def main(argv=None):
     
     if args.preset:
         preset = PERFORMANCE_PRESETS[args.preset]
-        segment_size = preset["demucs_segment_size"]
-        shifts = preset["demucs_shifts"]
-        overlap = preset["demucs_overlap"]
+        segment_size = preset["segment_size"]
+        shifts = preset["shifts"]
+        overlap = preset["overlap"]
         log.info("Using performance preset '%s': segment_size=%s, shifts=%s, overlap=%s", 
                  args.preset, segment_size, shifts, overlap)
     
